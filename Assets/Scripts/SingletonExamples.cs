@@ -132,7 +132,7 @@ partial struct UnmanagedSystem : ISystem
         if (Data.Count > 0)
         {
             UnityEngine.Debug.Log("Change exported from Parallel WriteJob");
-            SystemAPI.GetSingletonRW<GlobalData>().ValueRW.Value2 = 3;
+            SystemAPI.GetSingletonRW<GlobalData>().ValueRW.Value2 = 4;
         }
 
         var globalData = SystemAPI.GetSingleton<GlobalData>();
@@ -147,7 +147,7 @@ partial struct UnmanagedSystem : ISystem
 
         Data.Clear();
 
-        state.Dependency = new WriteJob
+        state.Dependency = new WriteJob_Correct
         {
             GlobalData = globalData,
             OutData = Data.AsParallelWriter(),
@@ -156,7 +156,7 @@ partial struct UnmanagedSystem : ISystem
     }
 
     [BurstCompile]
-    partial struct WriteJob : IJobEntity
+    partial struct WriteJob_Correct : IJobEntity
     {
         public GlobalData GlobalData;
 
@@ -168,6 +168,28 @@ partial struct UnmanagedSystem : ISystem
             if (trans.Position.y > GlobalData.Value1)
             {
                 OutData.Enqueue(1);
+
+                // Do something
+            }
+        }
+    }
+
+    [BurstCompile]
+    partial struct WriteJob_Problematic : IJobEntity
+    {
+        public Entity DefaultSingleton;
+        public GlobalData GlobalData;
+
+        [WriteOnly]
+        public EntityCommandBuffer.ParallelWriter CmdPW;
+
+        public void Execute([EntityIndexInQuery] int index, ref LocalTransform trans)
+        {
+            if (trans.Position.y > GlobalData.Value1)
+            {
+                GlobalData.Value2 = 4;
+                CmdPW.SetComponent(index, DefaultSingleton, GlobalData);
+
                 // Do something
             }
         }
