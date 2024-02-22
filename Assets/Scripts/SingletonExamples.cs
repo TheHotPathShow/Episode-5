@@ -2,12 +2,24 @@ using THPS.Singletons;
 using Unity.Burst;
 using Unity.Collections;
 using Unity.Entities;
+using Unity.Mathematics;
 using Unity.Transforms;
 
 struct GlobalData : IComponentData
 {
     public float Value1;
     public float Value2;
+}
+
+struct GlobalData2 : IComponentData
+{
+    public float4x4 Matrix1;
+    public float4x4 Matrix2;
+}
+
+struct GameModeState : IComponentData
+{
+    public float Value3;
 }
 
 struct TestComponent : IComponentData { }
@@ -17,16 +29,28 @@ partial class ManagedSystem : SystemBase
 {
     protected override void OnCreate()
     {
-        SingletonUtilities.Setup(EntityManager);
-        EntityManager.CreateOrSetSingleton(new GlobalData
+        // Normal
+        EntityManager.CreateSingleton<GlobalData2>();
+        EntityManager.CreateSingleton<GameModeState>();
+        EntityManager.CreateSingleton(new GlobalData
         {
             Value1 = 1.0f,
         });
+
+        // One entity, better
+        //SingletonUtilities.Setup(EntityManager);
+        //EntityManager.CreateOrAddSingleton<GlobalData2>();
+        //EntityManager.CreateOrAddSingleton<GameModeState>();
+        //EntityManager.CreateOrSetSingleton(new GlobalData
+        //{
+        //    Value1 = 1.0f,
+        //});
     }
 
     protected override void OnUpdate()
     {
-        var globalData = EntityManager.GetSingleton<GlobalData>();
+        //var globalData = EntityManager.GetSingleton<GlobalData>();
+        var globalData = SystemAPI.GetSingleton<GlobalData>();
 
         // No problem, just data
         Entities
@@ -67,11 +91,11 @@ partial class ManagedSystem : SystemBase
         }).Run();
 
         // Structural change
-        var defSingletonEntity = EntityManager.GetDefaultSingletonEntity();
-        if (SystemAPI.HasComponent<TestComponent>(defSingletonEntity))
-            EntityManager.RemoveComponent<TestComponent>(defSingletonEntity);
-        else
-            EntityManager.AddComponent<TestComponent>(defSingletonEntity);
+        //var defSingletonEntity = EntityManager.GetDefaultSingletonEntity();
+        //if (SystemAPI.HasComponent<TestComponent>(defSingletonEntity))
+        //    EntityManager.RemoveComponent<TestComponent>(defSingletonEntity);
+        //else
+        //    EntityManager.AddComponent<TestComponent>(defSingletonEntity);
 
         // Fix
         // globalDataRW = SystemAPI.GetSingletonRW<GlobalData>();
@@ -109,6 +133,7 @@ partial class ManagedSystem : SystemBase
 }
 
 [BurstCompile]
+[DisableAutoCreation]
 partial struct UnmanagedSystem : ISystem
 {
     private NativeQueue<byte> Data;
@@ -143,6 +168,18 @@ partial struct UnmanagedSystem : ISystem
             {
                 // Do something
             }
+        }
+
+        foreach (var (gameModeState, data1, data2) in SystemAPI.Query<GameModeState, GlobalData, GlobalData2>())
+        {
+            UnityEngine.Debug.Log("GameModeState, GlobalData and GlobalData2 is on the same Entity");
+        }
+
+        foreach (var gameModeState in SystemAPI.Query<GameModeState>().WithNone<GlobalData>())
+        {
+            var data12 = SystemAPI.GetSingleton<GlobalData>();
+            var data2 = SystemAPI.GetSingleton<GlobalData2>();
+            UnityEngine.Debug.Log("GameModeState, GlobalData and GlobalData2 is NOT on the same Entity");
         }
 
         Data.Clear();
